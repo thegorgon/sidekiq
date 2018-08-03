@@ -54,6 +54,19 @@ class TestWeb < Sidekiq::Test
       assert_match(/Oversikt/, last_response.body)
     end
 
+    it 'can provide a default, appropriate CSP for its content' do
+      get '/', {}, { "rack.url_scheme" => "http" }
+      policies = last_response.headers["Content-Security-Policy"].split('; ')
+      assert_includes(policies, "connect-src 'self' https: http: wss: ws:")
+      assert_includes(policies, "script-src 'self' https: http:")
+      assert_includes(policies, "object-src 'none'")
+      get '/', {}, { "rack.url_scheme" => "https" }
+      policies = last_response.headers["Content-Security-Policy"].split('; ')
+      assert_includes(policies, "connect-src 'self' https: wss:")
+      assert_includes(policies, "script-src 'self' https:")
+      assert_includes(policies, "object-src 'none'")
+    end
+
     describe 'busy' do
 
       it 'can display workers' do
