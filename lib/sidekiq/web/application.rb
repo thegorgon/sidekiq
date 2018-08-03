@@ -281,6 +281,9 @@ module Sidekiq
           "Content-Language" => action.locale,
         }
 
+        csp_header = get_csp_header(env["rack.url_scheme"])
+        headers["Content-Security-Policy"] = csp_header if csp_header
+
         [200, headers, [resp]]
       end
 
@@ -289,6 +292,30 @@ module Sidekiq
       resp[1][CONTENT_LENGTH] = resp[2].inject(0) { |l, p| l + p.bytesize }.to_s
 
       resp
+    end
+
+    def get_csp_header(scheme)
+      @csp_headers ||= {}
+      @csp_headers[scheme] ||= begin
+        return nil unless %w[https http].include?(scheme)
+        http_policy = scheme == "https" ? "https:" : "https: http:"
+        socket_policy = scheme == "https" ? "wss:" : "wss: ws:"
+        [
+          "default-src 'self' #{http_policy}",
+          "child-src 'self'",
+          "connect-src 'self' #{http_policy} #{socket_policy}",
+          "font-src 'self' #{http_policy}",
+          "frame-src 'self'",
+          "img-src 'self' #{http_policy} data:",
+          "manifest-src 'self'",
+          "media-src 'self'",
+          "object-src 'none'",
+          "script-src 'self' #{http_policy}",
+          "style-src 'self' #{http_policy} 'unsafe-inline'",
+          "worker-src 'self'",
+          "base-uri 'self'"
+        ].join('; ')
+      end
     end
 
     def self.helpers(mod=nil, &block)
